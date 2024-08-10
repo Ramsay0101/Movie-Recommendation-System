@@ -1,0 +1,64 @@
+import streamlit as st
+import pandas as pd
+import pickle
+import json
+
+# Load the pickled data
+with open('cosine_similarity_matrix.pkl', 'rb') as f:
+    cosine_sim = pickle.load(f)
+
+with open('user_pivot.pkl', 'rb') as f:
+    user_pivot = pickle.load(f)
+
+movies = pd.read_csv('movies.csv', on_bad_lines='skip')
+
+# Function to get movie recommendations
+def get_movie_recommendations(title, num_recommendations=5):
+    if title not in user_pivot.index:
+        return f"Movie title '{title}' not found in the dataset."
+    
+    movie_index = user_pivot.index.get_loc(title)
+    similarity_scores = list(enumerate(cosine_sim[movie_index]))
+    similarity_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
+    
+    recommended_titles = [user_pivot.index[i] for i, _ in similarity_scores if user_pivot.index[i] != title]
+    return recommended_titles[:num_recommendations]
+
+# Function to get movie details
+def get_movie_details(titles, movies_df):
+    details = []
+    for title in titles:
+        movie_info = movies_df[movies_df['title'] == title]
+        if not movie_info.empty:
+            overview = movie_info['overview'].values[0] if 'overview' in movie_info.columns else 'N/A'
+            
+            taglines=movie_info['tagline'].values[0] if 'overview' in movie_info.columns else 'N/A'
+            
+            details.append((title, overview, taglines))
+        else:
+            details.append((title, 'N/A', 'N/A'))
+    return details
+
+# Streamlit app layout
+st.set_page_config(page_title="Movie Recommendation System", layout="wide")
+st.title("Movie Recommendation System")
+st.write("Enter a movie title and click 'Recommend' to get similar movies.")
+
+# Search box
+movie_title = st.text_input("Movie Title")
+
+if st.button("Recommend"):
+    if movie_title:
+        recommendations = get_movie_recommendations(movie_title)
+        
+        if isinstance(recommendations, str):
+            st.error(recommendations)
+        else:
+            details = get_movie_details(recommendations, movies)
+            for title, overview, taglines in details:
+                st.write(f"**Title:** {title}")
+                st.write(f"**Overview:** {overview}")
+                st.write(f"**Tagline:** {taglines}")
+                st.write("---")
+    else:
+        st.warning("Please enter a movie title.")
